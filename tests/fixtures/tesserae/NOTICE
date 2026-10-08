@@ -1,0 +1,18 @@
+Cache0001.bin, Cache0001.bin.truth.json and Cache0001.source.png are
+samples of tesserae, under the MIT License (LICENSE, in this directory).
+Copyright (c) 2026 mikmok5.
+
+Source: https://github.com/mikmok5/tesserae, samples/, at commit
+25b991de6acd36a050cf08d4e67a4d9f82359cb7 (the files last changed in
+1616dd7f1f05a310b0e05d5538e7ce961bdfd24a).
+
+They are synthetic: `tesserae synth` cut the source image into 64x64
+tiles, wrote them as a Cache????.bin (RDP8bmp header, 32-bit BGRX, rows
+top-down) and recorded where each tile belongs (the truth file). No RDP
+client wrote them.
+
+SHA-256:
+
+  c3db77450256b568fe33064d96933932e902bcb0a082c6ba27c1118fb77577a6  Cache0001.bin
+  d9bed30a79697e340ee49698f513dd5fea5200a26a1e01dfa0d57996a5162bc1  Cache0001.bin.truth.json
+  da684c1e553a1e9b723c8c9069197a9448a48f4e8f586bfc92753f114946db46  Cache0001.source.png

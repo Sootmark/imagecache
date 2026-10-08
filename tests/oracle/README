@@ -1,0 +1,92 @@
+The expected outputs here come from tools independent of this crate, run,
+never vendored. Commands as run (Python 3.14, macOS; from the repository
+root unless a cd says otherwise).
+
+Tools
+-----
+
+  python3 -m venv /tmp/oracle-venv
+  /tmp/oracle-venv/bin/pip install dissect.thumbcache==1.11   # with dissect.cstruct 4.7, dissect.util 3.24
+  git clone https://github.com/ANSSI-FR/bmc-tools /tmp/bmc-tools   # at 5a4cad32be78b3b874aeec910cb478e04ba3501e (v3.05)
+
+dissect.thumbcache is AGPL-3.0 and bmc-tools CeCILL 2.1: both only run.
+
+Thumbnail caches (thumbcache_oracle.py: dissect.thumbcache for the
+structure, CRC-64 checks of its own)
+----------------------------------------------------------------
+
+  cd tests/fixtures/synthetic/thumbcache
+  /tmp/oracle-venv/bin/python -I ../../../oracle/thumbcache_oracle.py caches \
+      $(ls */*cache_*.db | grep -v idx | grep -v windows8/) > ../../../oracle/synthetic-caches.tsv
+  /tmp/oracle-venv/bin/python -I ../../../oracle/thumbcache_oracle.py index \
+      vista/thumbcache_idx.db windows7/thumbcache_idx.db windows10/thumbcache_idx.db \
+      > ../../../oracle/synthetic-index.tsv
+
+Real caches (Windows Vista, 7, 8.1, 10, 11), dissect.thumbcache's own test
+data, fetched locally and never committed:
+
+  tests/oracle/fetch-dissect-samples.sh
+  cd tests/fixtures-real/dissect
+  /tmp/oracle-venv/bin/python -I ../../oracle/thumbcache_oracle.py caches \
+      $(ls */thumbcache_*.db | grep -v idx) > ../../oracle/dissect-caches.tsv
+  /tmp/oracle-venv/bin/python -I ../../oracle/thumbcache_oracle.py index \
+      windows_vista/thumbcache_idx.db windows_7/thumbcache_idx.db \
+      windows_10/thumbcache_idx.db windows_11/thumbcache_idx.db > ../../oracle/dissect-index.tsv
+  cd ../../.. && cargo test -- --ignored
+
+dissect-*.tsv hold only what was read (offsets, hashes, identifiers, data
+sizes, SHA-256 of the image bytes, checksum results), not the caches.
+
+Left out, and why:
+- Windows 8.0 (format 30): dissect.thumbcache doesn't know it, and no
+  Windows 8.0 cache is openly available. Only the crate and the generator
+  read it, both from the documented format: unverified.
+- Windows 8.1 indexes: dissect.thumbcache starts reading 4 bytes late
+  (it skips 124 bytes of header, entries start at 120: Windows 8.1's
+  first entry, at 0x78, is visible in a hex dump). The tests check that
+  index instead by following each of its offsets into the cache files
+  and finding an entry with the same hash there (51 places, real; 16,
+  synthetic).
+- dissect.thumbcache returns everything after an entry's padding as its
+  data; Windows pads some entries past their data (a real Windows 10
+  PNG: 7 zero bytes after IEND), so the oracle keeps the header's data
+  size, as the crate does.
+
+RDP bitmap caches (rdp_oracle.py: bmc-tools' RLE decoder, pixel
+converters and palette per tile, plus bmc-tools' whole-file pass)
+----------------------------------------------------------------
+
+  cd tests/fixtures/synthetic/rdp
+  python3 -I ../../../oracle/rdp_oracle.py /tmp/bmc-tools/bmc-tools.py \
+      1:bcache2.bmc 2:bcache22.bmc 4:bcache24.bmc 3:bcache-depth3.bmc bin:Cache0002.bin \
+      > ../../../oracle/synthetic-tiles.tsv
+  cd ../../tesserae
+  python3 -I ../../oracle/rdp_oracle.py /tmp/bmc-tools/bmc-tools.py bin:Cache0001.bin \
+      > ../../oracle/tesserae-tiles.tsv
+
+Its summary (stderr), as run:
+
+  bcache2.bmc: bmc-tools finds 5 tiles; 2 compared pixel for pixel, all equal
+  bcache22.bmc: bmc-tools finds 5 tiles; 5 compared pixel for pixel, all equal
+  bcache24.bmc: bmc-tools finds 5 tiles; 2 compared pixel for pixel, all equal
+  bcache-depth3.bmc: bmc-tools finds 2 tiles; 2 compared pixel for pixel, all equal
+  Cache0002.bin: bmc-tools finds 3 tiles; 2 compared pixel for pixel, all equal
+  Cache0001.bin: bmc-tools finds 51 tiles; 51 compared pixel for pixel, all equal
+
+bmc-tools' whole-file pass converts every compressed tile as 16-bit
+(wrong for 8- and 32-bit ones), flips .bin rows 64 pixels at a time and
+drops .bin tiles under 64 pixels, so those tiles are compared through its
+decoder and converters only, not its pass.
+
+Ground truth of the tesserae sample (rdp_truth.py, standard library only:
+each tile cut from the source PNG, and the key tesserae derives from it):
+
+  cd tests/fixtures/tesserae
+  python3 -I ../../oracle/rdp_truth.py Cache0001.source.png Cache0001.bin.truth.json \
+      > ../../oracle/tesserae-truth.tsv
+
+Synthetic fixtures
+------------------
+
+  python3 -I tests/oracle/make_thumbcache.py tests/fixtures/synthetic/thumbcache
+  python3 -I tests/oracle/make_rdp.py tests/fixtures/synthetic/rdp
